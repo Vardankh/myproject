@@ -1,1 +1,144 @@
-hello world
+Pipeline Syntax 
+Table of Contents
+Declarative Pipeline
+Limitations
+Sections
+agent
+post
+stages
+steps
+Directives
+environment
+options
+parameters
+triggers
+Jenkins cron syntax
+stage
+tools
+input
+when
+Sequential Stages
+Parallel
+Matrix
+axes
+stages
+excludes (optional)
+Matrix cell-level directives (optional)
+Steps
+script
+Scripted Pipeline
+Flow Control
+Steps
+Differences from plain Groovy
+Syntax Comparison
+This section builds on the information introduced in Getting started with Pipeline and should be treated solely as a reference. For more information on how to use Pipeline syntax in practical examples, refer to the Using a Jenkinsfile section of this chapter. As of version 2.5 of the Pipeline plugin, Pipeline supports two discrete syntaxes which are detailed below. For the pros and cons of each, see the Syntax Comparison.
+
+As discussed at the start of this chapter, the most fundamental part of a Pipeline is the "step". Basically, steps tell Jenkins what to do and serve as the basic building block for both Declarative and Scripted Pipeline syntax.
+
+For an overview of available steps, please refer to the Pipeline Steps reference which contains a comprehensive list of steps built into Pipeline as well as steps provided by plugins.
+
+Declarative Pipeline
+Declarative Pipeline is a relatively recent addition to Jenkins Pipeline [1] which presents a more simplified and opinionated syntax on top of the Pipeline sub-systems.
+
+All valid Declarative Pipelines must be enclosed within a pipeline block, for example:
+
+pipeline {
+    /* insert Declarative Pipeline here */
+}
+The basic statements and expressions which are valid in Declarative Pipeline follow the same rules as Groovy’s syntax with the following exceptions:
+
+The top-level of the Pipeline must be a block, specifically: pipeline { }.
+
+No semicolons as statement separators. Each statement has to be on its own line.
+
+Blocks must only consist of Sections, Directives, Steps, or assignment statements.
+
+A property reference statement is treated as a no-argument method invocation. So, for example, input is treated as input().
+
+You can use the Declarative Directive Generator to help you get started with configuring the directives and sections in your Declarative Pipeline.
+
+Limitations
+There is currently an open issue which limits the maximum size of the code within the pipeline{} block. This limitation does not apply to Scripted pipelines.
+
+Sections
+Sections in Declarative Pipeline typically contain one or more Directives or Steps.
+
+agent
+The agent section specifies where the entire Pipeline, or a specific stage, will execute in the Jenkins environment depending on where the agent section is placed. The section must be defined at the top-level inside the pipeline block, but stage-level usage is optional.
+
+Required
+
+Yes
+
+Parameters
+
+Described below
+
+Allowed
+
+In the top-level pipeline block and each stage block.
+
+Differences between top and stage level Agents
+There are some nuances when adding an agent to the top level or a stage level, and this when the options directive is applied.
+
+Top Level Agents
+In agents declared at the outermost level of the Pipeline, the options are invoked after entering the agent. As an example, when using timeout it will be only applied to the execution within the agent.
+
+node("myAgent") {
+    timeout(unit: 'SECONDS', time: 5) {
+        stage("One"){
+            sleep 10
+            echo 'hello'
+        }
+    }
+}
+Stage Agents
+In agents declared within a stage, the options are invoked before entering the agent and before checking any when conditions. In this case, when using timeout, it is applied before the agent is allocated.
+
+timeout(unit: 'SECONDS', time: 5) {
+    stage("One"){
+        node {
+            sleep 10
+            echo 'Hello'
+        }
+    }
+}
+This timeout will include the agent provisioning time. Because the timeout includes the agent provisioning time, the Pipeline may fail in cases where agent allocation is delayed.
+
+Parameters
+In order to support the wide variety of use-cases Pipeline authors may have, the agent section supports a few different types of parameters. These parameters can be applied at the top-level of the pipeline block, or within each stage directive.
+
+any
+Execute the Pipeline, or stage, on any available agent. For example: agent any
+
+none
+When applied at the top-level of the pipeline block no global agent will be allocated for the entire Pipeline run and each stage section will need to contain its own agent section. For example: agent none
+
+label
+Execute the Pipeline, or stage, on an agent available in the Jenkins environment with the provided label. For example: agent { label 'my-defined-label' }
+
+Label conditions can also be used. For example: agent { label 'my-label1 && my-label2' } or agent { label 'my-label1 || my-label2' }
+
+node
+agent { node { label 'labelName' } } behaves the same as agent { label 'labelName' }, but node allows for additional options (such as customWorkspace).
+
+docker
+Execute the Pipeline, or stage, with the given container which will be dynamically provisioned on a node pre-configured to accept Docker-based Pipelines, or on a node matching the optionally defined label parameter. docker also optionally accepts an args parameter which may contain arguments to pass directly to a docker run invocation, and an alwaysPull option, which will force a docker pull even if the image name is already present. For example: agent { docker 'maven:3.8.1-adoptopenjdk-11' } or
+
+agent {
+    docker {
+        image 'maven:3.8.1-adoptopenjdk-11'
+        label 'my-defined-label'
+        args  '-v /tmp:/tmp'
+    }
+}
+docker also optionally accepts a registryUrl and registryCredentialsId parameters which will help to specify the Docker Registry to use and its credentials. The parameter registryCredentialsId could be used alone for private repositories within the docker hub. For example:
+
+agent {
+    docker {
+        image 'myregistry.com/node'
+        label 'my-defined-label'
+        registryUrl 'https://myregistry.com/'
+        registryCredentialsId 'myPredefinedCredentialsInJenkins'
+    }
+}
